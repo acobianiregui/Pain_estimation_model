@@ -1,0 +1,19 @@
+#Core numerical 
+numpy
+pandas
+#Signal processing
+scipy
+#Visualization
+matplotlib
+seaborn
+#Machine learning
+scikit-learn
+#Biosignal processing utilities
+neurokit2
+wfdb
+tsfresh
+heartpy
+#Notebooks
+jupyter
+#Progess bar
+tqdm
