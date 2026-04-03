@@ -21,11 +21,10 @@ def make_random_data(n_samples=200):
 ######################################################
 #MAIN
 X,y=make_random_data()
-d=
 X_train,X_test,y_train,y_test=train_test_split(X,y,test_size=TEST_SIZE,random_state=RANDOM_STATE)
 
 pipeline=create_LR_pipeline()
-metrics=train_and_evaluate(pipeline,X_train,y_train,X_test,y_test)
+metrics,y_pred=train_and_evaluate(pipeline,X_train,y_train,X_test,y_test)
 
 print("Results:")
 for name, value in metrics.items():

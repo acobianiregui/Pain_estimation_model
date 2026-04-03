@@ -20,5 +20,5 @@ def train_and_evaluate(pipeline, X_train, y_train, X_test, y_test):
     y_pred = pipeline.predict(X_test)
     metrics = calculate_metrics(y_test, y_pred)
     
-    return metrics
+    return metrics,y_pred
 
