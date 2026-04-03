@@ -33,7 +33,11 @@ The following diagram illustrates the processing pipeline used in this project.
 
 ![Project pipeline](proposal/block_diagram.png)
 ## Reproducibility
+To download all needed dependencies:
 
+```cmd 
+pip install -r requirements.txt
+```
 All experiments were conducted using the PainMonit dataset and the code in this repository. The dataset must be downloaded separately and placed in the `data/` folder.
 
 ## Disclaimer
