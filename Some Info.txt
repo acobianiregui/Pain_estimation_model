@@ -1,0 +1,68 @@
+To view the graphs of each, use this python code. Be sure to use the same directory your desired file is in.
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+file_path = r"YOUR DIRECTORY HERE\your_file.csv"
+df = pd.read_csv(file_path, sep=None, engine='python')  # automatically detects separator
+
+for col in df.columns:
+    df[col] = pd.to_numeric(df[col], errors='ignore')
+
+num_cols = len(df.columns)
+fig, axs = plt.subplots(num_cols, 1, figsize=(12, 3*num_cols), sharex=True)
+
+if num_cols == 1:
+    axs = [axs]  # make iterable if only one column
+
+for i, col in enumerate(df.columns):
+    axs[i].plot(df.index, df[col], color='blue')
+    axs[i].set_ylabel(col)
+    axs[i].set_title(f"{col} vs Index")
+
+axs[-1].set_xlabel("Index")
+plt.tight_layout()
+plt.show()
+
+
+
+Filter type for each signal:
+ECG: 0.5–40 Hz bandpass + Pan-Tompkins
+EMG: 20–100 Hz bandpass
+BVP: 0.5–5 Hz bandpass
+EDA: 1 Hz lowpass
+Resp: 1 Hz lowpass
+
+
+Code used for the filters:
+import numpy as np
+from scipy.signal import butter, filtfilt, convolve
+
+fs = 250  # Sampling frequency
+
+# ECG - Bandpass + PanTompkins
+def pan_tompkins_filter(ecg_signal, fs):
+    b, a = butter(1, [0.5/(fs/2), 40/(fs/2)], btype='band')
+    filtered = filtfilt(b, a, ecg_signal)
+    derivative = np.diff(filtered, n=1, prepend=filtered[0])
+    squared = derivative**2
+    window_size = int(0.150 * fs)
+    mwa = convolve(squared, np.ones(window_size)/window_size, mode='same')
+    return filtered, mwa
+
+# EMG - Bandpass
+def bandpass_filter(signal, fs, lowcut, highcut, order=2):
+    b, a = butter(order, [lowcut/(fs/2), highcut/(fs/2)], btype='band')
+    return filtfilt(b, a, signal)
+
+# BVP - Bandpass
+# (same as EMG)
+
+# EDA - Lowpass
+def lowpass_filter(signal, fs, cutoff, order=2):
+    b, a = butter(order, cutoff/(fs/2), btype='low')
+    return filtfilt(b, a, signal)
+
+# Resp - Lowpass
+# (same as EDA)
