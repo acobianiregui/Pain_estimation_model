@@ -19,7 +19,8 @@ painmonit-pain-estimation/
 ├── data/        
 ├── notebooks/           
 ├── src/                 
-│   ├── preprocessing.py
+│   ├── preprocessing/
+│   ├── ML/
 │   ├──...
 │   
 ├── proposal/
