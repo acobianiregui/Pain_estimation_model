@@ -17,3 +17,32 @@ FULL_FEATURES = [
 ]
  #to be deremined
 WEARABLE_FEATURES=[] #to be deremined
+"""
+For full set we have the following best parameters:
+BEST_PARAMS_RF = {
+    'model__n_estimators': ?,
+    'model__max_depth': ?,
+    'model__min_samples_split': ?,
+    'model__min_samples_leaf': ?
+}
+BEST_PARAMS_SVR = {
+    'model__C': ?,
+    'model__gamma': ?,
+    'model__kernel': ?
+}
+"""
+
+"""
+For wearable set we have the following best parameters:
+BEST_PARAMS_RF = {
+    'model__n_estimators': ?,
+    'model__max_depth': ?,
+    'model__min_samples_split': ?,
+    'model__min_samples_leaf': ?
+}
+BEST_PARAMS_SVR = {
+    'model__C': ?,
+    'model__gamma': ?,
+    'model__kernel': ?
+}
+"""

@@ -9,12 +9,22 @@ from src.ML.config import RANDOM_STATE
 def get_linear_regression():
     return LinearRegression()
 
-def get_random_forest():
-    return RandomForestRegressor(n_estimators=100, 
-                                 random_state=RANDOM_STATE,
-                                 n_jobs=-1)
+def get_random_forest(**model_params):
+    params = {
+        "n_estimators": 100,
+        "max_depth": None,
+        "min_samples_split": 2
+    }
 
-def get_svr():
-    return SVR()
+    #Override with given parameters (if given)
+    params.update(model_params)
+    return RandomForestRegressor(random_state=RANDOM_STATE, **params)
 
-#Methods to tune models
+def get_svr(**model_params):
+    params = {
+        "C": 1.0,
+        "gamma": 'scale',
+        "kernel": 'rbf'
+    }
+    params.update(model_params)
+    return SVR(**params)
