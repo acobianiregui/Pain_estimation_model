@@ -263,13 +263,10 @@ def resp_features(resp_window, fs=FS):
         if len(peaks) >= 2:
             peak_times       = peaks / fs
             breath_intervals = np.diff(peak_times)  # seconds
-            feats["resp_rate_bpm"]         = 60 / np.mean(breath_intervals)
-            feats["resp_interval_mean_s"]  = np.mean(breath_intervals)
-            feats["resp_interval_range_s"] = np.ptp(breath_intervals)
-            feats["resp_irregularity_idx"] = feats["resp_interval_range_s"] / feats["resp_interval_mean_s"] if feats["resp_interval_mean_s"] > 0 else np.nan
+            feats["resp_rate_bpm"]        = 60 / np.mean(breath_intervals)
+            feats["resp_interval_mean_s"] = np.mean(breath_intervals)
         else:
-            for k in ["resp_rate_bpm","resp_interval_mean_s",
-                      "resp_interval_range_s","resp_irregularity_idx"]:
+            for k in ["resp_rate_bpm", "resp_interval_mean_s"]:
                 feats[k] = np.nan
 
         # Tidal volume proxy
