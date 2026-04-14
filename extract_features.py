@@ -308,6 +308,9 @@ def extract_window_features(df_window, window_idx):
     row["t_start_s"] = t_start
     row["t_end_s"]   = t_end
 
+    # Average COVAS score for the window
+    row["covas_mean"] = np.nanmean(df_window["COVAS"].values)
+
     # Per-signal features
     row.update(ecg_features(df_window["Ecg"].values))
     row.update(eda_features(df_window["Eda_E4"].values, "eda_e4"))
@@ -383,7 +386,7 @@ def process_subject(filepath, subject_id):
     result_df = pd.DataFrame(rows)
 
     # Reorder: window metadata first, then features
-    meta_cols = ["window_idx", "t_start_s", "t_end_s"]
+    meta_cols = ["window_idx", "t_start_s", "t_end_s", "covas_mean"]
     feat_cols = [c for c in result_df.columns if c not in meta_cols]
     result_df = result_df[meta_cols + feat_cols]
 
