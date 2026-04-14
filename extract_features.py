@@ -1,13 +1,17 @@
 """
 Biosignal Feature Extraction for Pain Classification
 =====================================================
-Extracts features from 10-second non-overlapping windows across subjects 1–52.
-Input : One CSV per subject (semicolon-delimited), sampled at 250 Hz (0.004s).
-Output: One feature CSV per subject in the specified output folder.
+Extracts features from sliding/non-overlapping windows across subjects 1–52.
+Input : One CSV per subject (comma-delimited), sampled at 250 Hz (0.004 s).
+Output: One feature CSV per subject + one combined CSV in the output folder.
 
-Columns expected: Seconds;Ecg;Eda_E4;Eda_RB;Bvp;Emg;Resp;COVAS;Tmp
+Columns expected: Seconds,Ecg,Eda_E4,Eda_RB,Bvp,Emg,Resp,COVAS,Tmp
 
-Dependencies: pip install numpy pandas scipy neurokit2
+Entry point:
+    get_features(input_folder, output_folder, window_length,
+                 overlap=False, overlap_percentage=0.0)
+
+Dependencies: pip install numpy pandas scipy
 """
 
 import os
@@ -18,15 +22,9 @@ from scipy.signal import butter, filtfilt, find_peaks
 import warnings
 warnings.filterwarnings("ignore")
 
-# ── Configuration ────────────────────────────────────────────────────────────
+import re
 
-INPUT_FOLDER  = "./ECE4782_project_data/Filtered"          # folder containing subject CSVs
-OUTPUT_FOLDER = "./Features"      # folder where feature CSVs will be saved
-FS            = 250               # sampling frequency (1 / 0.004 s)
-WINDOW_SEC    = 10                # non-overlapping window length in seconds
-WINDOW_SAMPLES = FS * WINDOW_SEC  # = 2500 samples per window
-
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+FS = 250  # sampling frequency (Hz) — fixed by the hardware
 
 # ── Filter helpers ────────────────────────────────────────────────────────────
 
@@ -79,8 +77,13 @@ def basic_stats(arr, prefix):
 
 def ecg_features(ecg_window, fs=FS):
     feats = {}
-    # Basic stats on raw signal
     feats.update(basic_stats(ecg_window, "ecg"))
+
+    # Initialise all derived features to NaN
+    for k in ["ecg_hr_bpm","ecg_rr_mean_ms","ecg_rr_std_ms","ecg_rmssd",
+              "ecg_rr_range_ms","ecg_pnn50","ecg_poincare_sd1","ecg_poincare_sd2",
+              "ecg_lf_power","ecg_hf_power","ecg_lf_hf_ratio"]:
+        feats[k] = np.nan
 
     # R-peak detection
     try:
@@ -93,7 +96,7 @@ def ecg_features(ecg_window, fs=FS):
             rr_intervals = np.diff(peaks) / fs * 1000  # ms
             feats["ecg_hr_bpm"]      = 60000 / np.mean(rr_intervals)
             feats["ecg_rr_mean_ms"]  = np.mean(rr_intervals)
-            feats["ecg_rr_std_ms"]   = np.std(rr_intervals, ddof=1)   # SDNN
+            feats["ecg_rr_std_ms"]   = np.std(rr_intervals, ddof=1)
             feats["ecg_rmssd"]       = np.sqrt(np.mean(np.diff(rr_intervals) ** 2))
             feats["ecg_rr_range_ms"] = np.ptp(rr_intervals)
             nn50 = np.sum(np.abs(np.diff(rr_intervals)) > 50)
@@ -118,15 +121,9 @@ def ecg_features(ecg_window, fs=FS):
                 hf_mask = (freqs >= 0.15) & (freqs < 0.4)
                 lf_pow  = np.trapz(psd[lf_mask], freqs[lf_mask]) if lf_mask.any() else 0
                 hf_pow  = np.trapz(psd[hf_mask], freqs[hf_mask]) if hf_mask.any() else 0
-                feats["ecg_lf_power"]  = lf_pow
-                feats["ecg_hf_power"]  = hf_pow
+                feats["ecg_lf_power"]    = lf_pow
+                feats["ecg_hf_power"]    = hf_pow
                 feats["ecg_lf_hf_ratio"] = lf_pow / hf_pow if hf_pow > 0 else np.nan
-        else:
-            # Not enough peaks — fill with NaN
-            for k in ["ecg_hr_bpm","ecg_rr_mean_ms","ecg_rr_std_ms","ecg_rmssd",
-                      "ecg_rr_range_ms","ecg_pnn50","ecg_poincare_sd1",
-                      "ecg_poincare_sd2","ecg_lf_power","ecg_hf_power","ecg_lf_hf_ratio"]:
-                feats[k] = np.nan
     except Exception:
         pass
 
@@ -137,6 +134,11 @@ def eda_features(eda_window, prefix, fs=FS):
     """Shared EDA extractor — works for both E4 and RB placement."""
     feats = {}
     feats.update(basic_stats(eda_window, prefix))
+
+    for k in [f"{prefix}_scl_mean", f"{prefix}_scl_std", f"{prefix}_scl_slope",
+              f"{prefix}_scr_n_peaks", f"{prefix}_scr_mean_amp", f"{prefix}_scr_max_amp",
+              f"{prefix}_scr_auc", f"{prefix}_sma"]:
+        feats[k] = np.nan
 
     try:
         # Decompose: SCL = low-pass <0.05 Hz; SCR = residual
@@ -177,6 +179,10 @@ def bvp_features(bvp_window, fs=FS):
     feats = {}
     feats.update(basic_stats(bvp_window, "bvp"))
 
+    for k in ["bvp_ac_dc_ratio","bvp_hr_bpm","bvp_ibi_mean_ms","bvp_ibi_std_ms",
+              "bvp_ibi_cv","bvp_pulse_amp_mean","bvp_pulse_amp_std","bvp_vasomotor_power"]:
+        feats[k] = np.nan
+
     try:
         peaks, _ = find_peaks(bvp_window,
                               distance=int(0.4 * fs),
@@ -189,16 +195,12 @@ def bvp_features(bvp_window, fs=FS):
 
         if len(peaks) >= 2:
             ibi = np.diff(peaks) / fs * 1000  # ms
-            feats["bvp_hr_bpm"]      = 60000 / np.mean(ibi)
-            feats["bvp_ibi_mean_ms"] = np.mean(ibi)
-            feats["bvp_ibi_std_ms"]  = np.std(ibi, ddof=1)
-            feats["bvp_ibi_cv"]      = feats["bvp_ibi_std_ms"] / feats["bvp_ibi_mean_ms"] if feats["bvp_ibi_mean_ms"] > 0 else np.nan
+            feats["bvp_hr_bpm"]         = 60000 / np.mean(ibi)
+            feats["bvp_ibi_mean_ms"]    = np.mean(ibi)
+            feats["bvp_ibi_std_ms"]     = np.std(ibi, ddof=1)
+            feats["bvp_ibi_cv"]         = feats["bvp_ibi_std_ms"] / feats["bvp_ibi_mean_ms"] if feats["bvp_ibi_mean_ms"] > 0 else np.nan
             feats["bvp_pulse_amp_mean"] = np.mean(bvp_window[peaks])
             feats["bvp_pulse_amp_std"]  = np.std(bvp_window[peaks], ddof=1)
-        else:
-            for k in ["bvp_hr_bpm","bvp_ibi_mean_ms","bvp_ibi_std_ms",
-                      "bvp_ibi_cv","bvp_pulse_amp_mean","bvp_pulse_amp_std"]:
-                feats[k] = np.nan
 
         # Frequency domain: vasomotor band
         freqs, psd = signal.welch(bvp_window, fs=fs, nperseg=min(len(bvp_window), 512))
@@ -214,6 +216,10 @@ def bvp_features(bvp_window, fs=FS):
 def emg_features(emg_window, fs=FS):
     feats = {}
     feats.update(basic_stats(emg_window, "emg"))
+
+    for k in ["emg_rms","emg_mav","emg_iemg","emg_wl","emg_zcr",
+              "emg_median_freq","emg_mean_freq","emg_band_50_150_power","emg_n_bursts"]:
+        feats[k] = np.nan
 
     try:
         emg_rect = np.abs(emg_window)
@@ -253,6 +259,10 @@ def resp_features(resp_window, fs=FS):
     feats = {}
     feats.update(basic_stats(resp_window, "resp"))
 
+    for k in ["resp_rate_bpm","resp_interval_mean_s","resp_amp_mean",
+              "resp_amp_std","resp_dominant_freq"]:
+        feats[k] = np.nan
+
     try:
         resp_filt = bandpass(resp_window, 0.1, 1.0, fs)
 
@@ -265,9 +275,6 @@ def resp_features(resp_window, fs=FS):
             breath_intervals = np.diff(peak_times)  # seconds
             feats["resp_rate_bpm"]        = 60 / np.mean(breath_intervals)
             feats["resp_interval_mean_s"] = np.mean(breath_intervals)
-        else:
-            for k in ["resp_rate_bpm", "resp_interval_mean_s"]:
-                feats[k] = np.nan
 
         # Tidal volume proxy
         if len(peaks) > 0 and len(troughs) > 0:
@@ -286,8 +293,6 @@ def resp_features(resp_window, fs=FS):
         resp_band  = (freqs >= 0.1) & (freqs <= 1.0)
         if resp_band.any():
             feats["resp_dominant_freq"] = freqs[resp_band][np.argmax(psd[resp_band])]
-        else:
-            feats["resp_dominant_freq"] = np.nan
 
     except Exception:
         pass
@@ -305,8 +310,12 @@ def extract_window_features(df_window, window_idx):
     row["t_start_s"] = t_start
     row["t_end_s"]   = t_end
 
-    # Average COVAS score for the window
-    row["covas_mean"] = np.nanmean(df_window["COVAS"].values)
+    # COVAS summary statistics for the window
+    covas_vals = df_window["COVAS"].values
+    row["covas_mean"] = np.nanmean(covas_vals)
+    row["covas_max"]  = np.nanmax(covas_vals)
+    row["covas_min"]  = np.nanmin(covas_vals)
+    row["covas_diff"] = row["covas_max"] - row["covas_min"]
 
     # Per-signal features
     row.update(ecg_features(df_window["Ecg"].values))
@@ -343,7 +352,17 @@ def extract_window_features(df_window, window_idx):
 
 # ── Per-subject processing ────────────────────────────────────────────────────
 
-def process_subject(filepath, subject_id):
+def process_subject(filepath, subject_id, window_samples, step_samples):
+    """Extract windowed features for a single subject CSV.
+
+    Parameters
+    ----------
+    filepath       : path to the subject's CSV file
+    subject_id     : integer subject index (used as subject_idx column value)
+    window_samples : number of samples per window
+    step_samples   : number of samples to advance between window starts;
+                     equals window_samples when there is no overlap
+    """
     print(f"  Processing subject {subject_id}...")
 
     try:
@@ -366,62 +385,167 @@ def process_subject(filepath, subject_id):
     df = df.dropna(subset=sig_cols).reset_index(drop=True)
 
     n_samples = len(df)
-    n_windows = n_samples // WINDOW_SAMPLES
 
-    if n_windows == 0:
-        print(f"    WARNING: subject {subject_id} has fewer than {WINDOW_SAMPLES} samples. Skipping.")
+    if n_samples < window_samples:
+        print(f"    WARNING: subject {subject_id} has fewer than {window_samples} samples. Skipping.")
         return None
 
+    # Build list of window start indices
+    starts = list(range(0, n_samples - window_samples + 1, step_samples))
+
     rows = []
-    for w in range(n_windows):
-        start = w * WINDOW_SAMPLES
-        end   = start + WINDOW_SAMPLES
+    for w, start in enumerate(starts):
+        end       = start + window_samples
         window_df = df.iloc[start:end]
-        feats = extract_window_features(window_df, w)
+        feats     = extract_window_features(window_df, w)
         rows.append(feats)
 
     result_df = pd.DataFrame(rows)
 
-    # Reorder: window metadata first, then features
-    meta_cols = ["window_idx", "t_start_s", "t_end_s", "covas_mean"]
+    # Add subject index as the first column
+    result_df.insert(0, "subject_idx", subject_id)
+
+    # Reorder: subject metadata first, then window metadata, then features
+    meta_cols = ["subject_idx", "window_idx", "t_start_s", "t_end_s",
+                 "covas_mean", "covas_max", "covas_min", "covas_diff"]
     feat_cols = [c for c in result_df.columns if c not in meta_cols]
     result_df = result_df[meta_cols + feat_cols]
 
     return result_df
 
 
-# ── Main loop ─────────────────────────────────────────────────────────────────
+# ── Public API ────────────────────────────────────────────────────────────────
 
-def main():
+def get_features(
+    input_folder: str,
+    output_folder: str,
+    window_length: float,
+    overlap: bool = False,
+    overlap_percentage: float = 0.0,
+) -> pd.DataFrame:
+    """Extract biosignal features for all subjects and save results to CSV files.
+
+    Parameters
+    ----------
+    input_folder : str
+        Path to the folder containing per-subject CSV files.
+    output_folder : str
+        Path to the folder where per-subject feature CSVs and the combined CSV
+        will be written (created automatically if it does not exist).
+    window_length : float
+        Length of each analysis window in seconds (e.g. 10.0).
+    overlap : bool, optional
+        Whether consecutive windows should overlap.  Default is False
+        (non-overlapping / tumbling windows).
+    overlap_percentage : float, optional
+        Percentage of a window that is covered by the *next* window when
+        ``overlap=True``.  Must be in the range [0, 50).  A value of 50 would
+        mean each window starts at the midpoint of the previous one.
+        Ignored when ``overlap=False``.  Default is 0.0.
+
+    Returns
+    -------
+    pd.DataFrame
+        Combined DataFrame with all subjects and all windows.
+        Also written to ``<output_folder>/all_subjects_features.csv``.
+
+    Raises
+    ------
+    ValueError
+        If ``window_length`` is not positive, or if ``overlap_percentage`` is
+        outside [0, 50).
+    FileNotFoundError
+        If ``input_folder`` does not exist.
+    """
+
+    # ── Parameter validation ──────────────────────────────────────────────────
+    if not isinstance(input_folder, str):
+        raise TypeError("input_folder must be a string.")
+    if not isinstance(output_folder, str):
+        raise TypeError("output_folder must be a string.")
+    if not os.path.isdir(input_folder):
+        raise FileNotFoundError(f"Input folder not found: '{input_folder}'")
+    if window_length <= 0:
+        raise ValueError(f"window_length must be positive, got {window_length}.")
+    if overlap and not (0.0 <= overlap_percentage < 50.0):
+        raise ValueError(
+            f"overlap_percentage must be in [0, 50), got {overlap_percentage}."
+        )
+
+    # ── Derive sample counts ──────────────────────────────────────────────────
+    window_samples = int(round(window_length * FS))
+
+    if overlap:
+        # step = window minus the overlapping tail
+        overlap_samples = int(round(overlap_percentage / 100.0 * window_samples))
+        step_samples    = window_samples - overlap_samples
+    else:
+        step_samples = window_samples   # tumbling (non-overlapping) windows
+
+    os.makedirs(output_folder, exist_ok=True)
+
+    print(f"Window : {window_length} s  ({window_samples} samples)")
+    if overlap:
+        print(f"Overlap: {overlap_percentage}%  (step = {step_samples} samples)")
+    else:
+        print("Overlap: none")
+
+    # ── Discover subject files ────────────────────────────────────────────────
     csv_files = sorted([
-        f for f in os.listdir(INPUT_FOLDER)
+        f for f in os.listdir(input_folder)
         if f.lower().endswith(".csv")
     ])
 
     if not csv_files:
-        print(f"No CSV files found in '{INPUT_FOLDER}'. Check INPUT_FOLDER path.")
-        return
+        print(f"No CSV files found in '{input_folder}'. Check input_folder path.")
+        return pd.DataFrame()
 
-    print(f"Found {len(csv_files)} CSV file(s) in '{INPUT_FOLDER}'.\n")
+    print(f"\nFound {len(csv_files)} CSV file(s) in '{input_folder}'.\n")
 
-    processed = 0
+    # ── Process each subject ──────────────────────────────────────────────────
+    processed    = 0
+    all_subjects = []
+
     for fname in csv_files:
-        # Infer subject ID from filename (takes first integer found)
-        import re
-        nums = re.findall(r"\d+", fname)
+        nums       = re.findall(r"\d+", fname)
         subject_id = int(nums[0]) if nums else fname
 
-        filepath = os.path.join(INPUT_FOLDER, fname)
-        result   = process_subject(filepath, subject_id)
+        filepath = os.path.join(input_folder, fname)
+        result   = process_subject(filepath, subject_id, window_samples, step_samples)
 
         if result is not None:
-            out_path = os.path.join(OUTPUT_FOLDER, f"subject_{subject_id:02d}_features.csv")
+            out_path = os.path.join(output_folder, f"subject_{subject_id:02d}_features.csv")
             result.to_csv(out_path, index=False)
             print(f"    Saved {len(result)} windows → {out_path}")
+            all_subjects.append(result)
             processed += 1
 
+    # ── Combine and write master CSV ──────────────────────────────────────────
+    if not all_subjects:
+        print("\nNo subjects were processed successfully.")
+        return pd.DataFrame()
+
+    combined = pd.concat(all_subjects, ignore_index=True)
+    combined.sort_values(["subject_idx", "window_idx"], inplace=True)
+    combined_path = os.path.join(output_folder, "all_subjects_features.csv")
+    combined.to_csv(combined_path, index=False)
+    print(f"\nCombined CSV ({len(combined)} rows, {len(combined.columns)} columns) → {combined_path}")
     print(f"\nDone. {processed}/{len(csv_files)} subjects processed.")
-    print(f"Feature CSVs written to '{OUTPUT_FOLDER}/'.")
+    print(f"Feature CSVs written to '{output_folder}/'.")
+
+    return combined
+
+
+# ── Backwards-compatible entry point ─────────────────────────────────────────
+
+def main():
+    """Run with the original default settings (10 s, no overlap)."""
+    get_features(
+        input_folder="./data",
+        output_folder="./features",
+        window_length=10.0,
+        overlap=False,
+    )
 
 
 if __name__ == "__main__":
