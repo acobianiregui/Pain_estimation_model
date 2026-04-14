@@ -81,8 +81,7 @@ def ecg_features(ecg_window, fs=FS):
 
     # Initialise all derived features to NaN
     for k in ["ecg_hr_bpm","ecg_rr_mean_ms","ecg_rr_std_ms","ecg_rmssd",
-              "ecg_rr_range_ms","ecg_pnn50","ecg_poincare_sd1","ecg_poincare_sd2",
-              "ecg_lf_power","ecg_hf_power","ecg_lf_hf_ratio"]:
+              "ecg_rr_range_ms","ecg_pnn50"]:
         feats[k] = np.nan
 
     # R-peak detection
@@ -101,29 +100,6 @@ def ecg_features(ecg_window, fs=FS):
             feats["ecg_rr_range_ms"] = np.ptp(rr_intervals)
             nn50 = np.sum(np.abs(np.diff(rr_intervals)) > 50)
             feats["ecg_pnn50"]       = nn50 / len(rr_intervals) * 100
-
-            # Poincaré SD1 / SD2
-            d   = np.diff(rr_intervals)
-            sd1 = np.std(d / np.sqrt(2), ddof=1)
-            sd2 = np.std(rr_intervals - np.mean(rr_intervals) + d / np.sqrt(2), ddof=1)
-            feats["ecg_poincare_sd1"] = sd1
-            feats["ecg_poincare_sd2"] = sd2
-
-            # HRV frequency domain (Welch on RR series if enough beats)
-            if len(rr_intervals) >= 4:
-                rr_fs = 4  # resample RR to 4 Hz for spectral analysis
-                rr_time = np.cumsum(rr_intervals) / 1000
-                rr_time -= rr_time[0]
-                t_uniform = np.arange(0, rr_time[-1], 1 / rr_fs)
-                rr_interp = np.interp(t_uniform, rr_time, rr_intervals)
-                freqs, psd = signal.welch(rr_interp, fs=rr_fs, nperseg=min(len(rr_interp), 64))
-                lf_mask = (freqs >= 0.04) & (freqs < 0.15)
-                hf_mask = (freqs >= 0.15) & (freqs < 0.4)
-                lf_pow  = np.trapz(psd[lf_mask], freqs[lf_mask]) if lf_mask.any() else 0
-                hf_pow  = np.trapz(psd[hf_mask], freqs[hf_mask]) if hf_mask.any() else 0
-                feats["ecg_lf_power"]    = lf_pow
-                feats["ecg_hf_power"]    = hf_pow
-                feats["ecg_lf_hf_ratio"] = lf_pow / hf_pow if hf_pow > 0 else np.nan
     except Exception:
         pass
 
@@ -136,8 +112,7 @@ def eda_features(eda_window, prefix, fs=FS):
     feats.update(basic_stats(eda_window, prefix))
 
     for k in [f"{prefix}_scl_mean", f"{prefix}_scl_std", f"{prefix}_scl_slope",
-              f"{prefix}_scr_n_peaks", f"{prefix}_scr_mean_amp", f"{prefix}_scr_max_amp",
-              f"{prefix}_scr_auc", f"{prefix}_sma"]:
+              f"{prefix}_scr_n_peaks", f"{prefix}_scr_mean_amp", f"{prefix}_scr_max_amp"]:
         feats[k] = np.nan
 
     try:
@@ -160,14 +135,9 @@ def eda_features(eda_window, prefix, fs=FS):
         if len(peaks) > 0:
             feats[f"{prefix}_scr_mean_amp"] = np.mean(props["peak_heights"])
             feats[f"{prefix}_scr_max_amp"]  = np.max(props["peak_heights"])
-            feats[f"{prefix}_scr_auc"]      = np.trapz(scr_rect)
         else:
             feats[f"{prefix}_scr_mean_amp"] = 0.0
             feats[f"{prefix}_scr_max_amp"]  = 0.0
-            feats[f"{prefix}_scr_auc"]      = np.trapz(scr_rect)
-
-        # Signal magnitude area
-        feats[f"{prefix}_sma"] = np.sum(np.abs(eda_window)) / len(eda_window)
 
     except Exception:
         pass
@@ -218,7 +188,7 @@ def emg_features(emg_window, fs=FS):
     feats.update(basic_stats(emg_window, "emg"))
 
     for k in ["emg_rms","emg_mav","emg_iemg","emg_wl","emg_zcr",
-              "emg_median_freq","emg_mean_freq","emg_band_50_150_power","emg_n_bursts"]:
+              "emg_median_freq","emg_mean_freq"]:
         feats[k] = np.nan
 
     try:
@@ -241,13 +211,6 @@ def emg_features(emg_window, fs=FS):
             cum_pow   = np.cumsum(psd[pos]) / np.sum(psd[pos])
             feats["emg_median_freq"] = freqs[pos][np.searchsorted(cum_pow, 0.5)]
             feats["emg_mean_freq"]   = np.sum(freqs[pos] * psd[pos]) / np.sum(psd[pos]) if np.sum(psd[pos]) > 0 else np.nan
-            band_mask = (freqs >= 50) & (freqs <= 150)
-            feats["emg_band_50_150_power"] = np.trapz(psd[band_mask], freqs[band_mask]) if band_mask.any() else 0.0
-
-        # Activation bursts — threshold on rectified signal directly
-        threshold = 3 * np.std(emg_rect)
-        bursts, _ = find_peaks(emg_rect, height=threshold, distance=int(0.1 * fs))
-        feats["emg_n_bursts"] = len(bursts)
 
     except Exception:
         pass
@@ -259,8 +222,8 @@ def resp_features(resp_window, fs=FS):
     feats = {}
     feats.update(basic_stats(resp_window, "resp"))
 
-    for k in ["resp_rate_bpm","resp_interval_mean_s","resp_amp_mean",
-              "resp_amp_std","resp_dominant_freq"]:
+    for k in ["resp_rate_bpm","resp_interval_mean_s","resp_interval_range_s",
+              "resp_irregularity_idx","resp_amp_mean","resp_amp_std","resp_dominant_freq"]:
         feats[k] = np.nan
 
     try:
@@ -273,8 +236,15 @@ def resp_features(resp_window, fs=FS):
         if len(peaks) >= 2:
             peak_times       = peaks / fs
             breath_intervals = np.diff(peak_times)  # seconds
-            feats["resp_rate_bpm"]        = 60 / np.mean(breath_intervals)
-            feats["resp_interval_mean_s"] = np.mean(breath_intervals)
+            feats["resp_rate_bpm"]         = 60 / np.mean(breath_intervals)
+            feats["resp_interval_mean_s"]  = np.mean(breath_intervals)
+            # Range of breath-to-breath intervals — rises with irregular breathing
+            feats["resp_interval_range_s"] = np.ptp(breath_intervals)
+            # Coefficient of variation using range — normalised irregularity measure
+            feats["resp_irregularity_idx"] = (
+                np.ptp(breath_intervals) / np.mean(breath_intervals)
+                if np.mean(breath_intervals) > 0 else np.nan
+            )
 
         # Tidal volume proxy
         if len(peaks) > 0 and len(troughs) > 0:
