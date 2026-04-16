@@ -3,12 +3,12 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVR
-from src.ML.pipelines import create_RF_pipeline, create_SVR_pipeline
+from src.ML.pipelines import create_RF_pipeline, create_SVR_pipeline,create_XGBOOST_pipeline
 
 from sklearn.model_selection import GridSearchCV
 
 
-def tune_RF(X_train, y_train):
+def tune_RF(X_train, y_train,PCA_n_components=None):
     """
     Receives training data and performs grid search to tune model with best params.
     Hyperparameters to tune:
@@ -21,21 +21,35 @@ def tune_RF(X_train, y_train):
         - 'sqrt': square root of the number of features
         - 'log2': logarithm base 2 of the number of features
     """
-    pipeline = create_RF_pipeline()
-
+    if PCA_n_components != None:
+        pipeline=create_RF_pipeline(PCA_n_components=PCA_n_components)
+    else:
+        pipeline = create_RF_pipeline()
+    
+    #extensive param_grid
+    """
     param_grid = {
-    'model__n_estimators': [100, 200, 300, 500],
-    'model__max_depth': [None, 10, 20, 30],
+    'model__n_estimators': [100, 200, 300],
+    'model__max_depth': [None, 10, 20],
     'model__min_samples_split': [2, 5, 10],
     'model__min_samples_leaf': [1, 2, 4],
     'model__max_features': [1.0, 'sqrt', 'log2']
-}
+    }
+    """
+    #Param_grid soft
+    param_grid = {
+    'model__n_estimators': [100, 200,300],
+    'model__max_depth': [None, 10,20],
+    'model__min_samples_split': [2, 5],
+    'model__min_samples_leaf': [1, 2],
+    'model__max_features': ['sqrt','log2',1.0]
+    }
 
     grid_search = GridSearchCV(
         estimator=pipeline,
         param_grid=param_grid,
-        cv=5,
-        scoring='neg_mean_absolute_error',
+        cv=3,
+        scoring='r2',
         n_jobs=-1
     )
 
@@ -43,7 +57,7 @@ def tune_RF(X_train, y_train):
 
     return grid_search
 
-def tune_SVR(X_train, y_train):
+def tune_SVR(X_train, y_train,PCA_n_components=None):
     """
     Receives training data and performs grid search to tune model with best params.
     Hyperparameters to tune:
@@ -53,8 +67,11 @@ def tune_SVR(X_train, y_train):
     - epsilon: margin of tolerance for error 
     - degree: degree of the polynomial kernel
     """
-    pipeline = create_SVR_pipeline()
-
+    if PCA_n_components != None:
+        pipeline=create_SVR_pipeline(PCA_n_components=PCA_n_components)
+    else:
+        pipeline = create_SVR_pipeline()
+    """
     param_grid = [
         #grid for rbf kernel (non-linear)
         {
@@ -78,12 +95,54 @@ def tune_SVR(X_train, y_train):
             'model__epsilon': [0.01, 0.1, 0.5]
         }
     ]
+    """
+    param_grid = [
+    {
+        'model__kernel': ['rbf'],
+        'model__C': [0.1, 1, 10,100],
+        'model__gamma': ['scale', 'auto'],
+        'model__epsilon': [0.1, 0.5]
+    },
+    {
+            'model__kernel': ['poly'],
+            'model__C': [0.1, 1, 10,100],
+            'model__gamma': ['scale','auto'],
+            'model__degree': [2, 3,4],
+            'model__epsilon': [0.01, 0.1]
+        }
+]
 
     grid_search = GridSearchCV(
         estimator=pipeline,
         param_grid=param_grid,
-        cv=5,
-        scoring='neg_mean_absolute_error',
+        cv=3,
+        scoring='r2',
+        n_jobs=-1
+    )
+
+    grid_search.fit(X_train, y_train)
+
+    return grid_search
+def tune_XGBOOST(X_train, y_train,PCA_n_components=None):
+    if PCA_n_components != None:
+        pipeline=create_XGBOOST_pipeline(PCA_n_components=PCA_n_components)
+    else:
+        pipeline = create_XGBOOST_pipeline()
+
+    param_grid = {
+    "model__n_estimators": [200, 300, 400],
+    "model__learning_rate": [0.03, 0.05],
+    "model__max_depth": [4, 5, 6],
+    "model__min_child_weight": [1, 2],
+    "model__subsample": [0.8, 0.9],
+    "model__colsample_bytree": [0.8, 0.9],
+    "model__reg_lambda": [3.0, 5.0, 7.0]
+    }
+    grid_search = GridSearchCV(
+        estimator=pipeline,
+        param_grid=param_grid,
+        cv=3,
+        scoring='r2',
         n_jobs=-1
     )
 

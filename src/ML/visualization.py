@@ -189,3 +189,15 @@ def plot_svr_permutation_importance(pipeline, X, y, feature_names, n_repeats=10,
     plt.title("SVR Feature Importance (Permutation Importance)")
     plt.tight_layout()
     plt.show()
+
+
+def plot_corr_with_target(X, y, figsize=(8, 14)):
+    X_clean = X.loc[:, X.nunique(dropna=False) > 1].copy()
+    corr_with_y = X_clean.corrwith(y).sort_values()
+
+    plt.figure(figsize=figsize)
+    corr_with_y.plot(kind="barh")
+    plt.xlabel("Correlation with target")
+    plt.title("Feature Correlation with Target")
+    plt.tight_layout()
+    plt.show()
