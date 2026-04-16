@@ -386,7 +386,7 @@ def process_subject(filepath, subject_id, window_samples, step_samples):
 
     # Reorder: subject metadata first, then window metadata, then features
     meta_cols = ["subject_idx", "window_idx", "t_start_s", "t_end_s",
-                 "covas_mean", "covas_max", "covas_min", "covas_diff"]
+                 "covas_mean", "covas_max", "covas_min", "covas_diff", "covas_delta"]
     feat_cols = [c for c in result_df.columns if c not in meta_cols]
     result_df = result_df[meta_cols + feat_cols]
 
