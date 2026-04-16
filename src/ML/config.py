@@ -5,7 +5,7 @@ RANDOM_STATE=42
 TEST_SIZE=0.2
 CV_FOLDS=5
 
-TARGET="COVAS"
+TARGET="covas_max"
 #Template features, NOT FINAL
 FULL_FEATURES = [ 
     "bvp_mean", "bvp_std",
@@ -15,7 +15,8 @@ FULL_FEATURES = [
     "ecg_hr", "ecg_hrv",
     "emg_rms", "emg_energy",
 ]
- #to be deremined
+#to be deremined
+EXCLUDED=["subject_idx","window_idx","t_start_s","t_end_s","covas_mean","covas_max","covas_min","covas_diff"]
 WEARABLE_FEATURES=[] #to be deremined
 """
 For full set we have the following best parameters:

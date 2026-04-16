@@ -2,6 +2,7 @@
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVR
+from xgboost import XGBRegressor
 
 from src.ML.config import RANDOM_STATE
 
@@ -28,3 +29,18 @@ def get_svr(**model_params):
     }
     params.update(model_params)
     return SVR(**params)
+
+def get_xgboost(**model_params):
+    params = {
+    "objective": "reg:squarederror",
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "max_depth": 4,
+    "min_child_weight": 5,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_lambda": 1.0,
+    "reg_alpha": 0.0
+    }
+    params.update(model_params)
+    return XGBRegressor(**model_params)

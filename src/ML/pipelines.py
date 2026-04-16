@@ -4,7 +4,7 @@ from sklearn.decomposition import PCA
 from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from src.ML.models import get_linear_regression, get_random_forest, get_svr
+from src.ML.models import get_linear_regression, get_random_forest, get_svr,get_xgboost
 from src.ML.config import RANDOM_STATE
 
 #General pipeline structure
@@ -53,5 +53,18 @@ def create_SVR_pipeline(PCA_n_components=None,**model_params):
         steps = [
             ('scaler', StandardScaler()),
             ('model', get_svr(**model_params))
+        ]
+    return Pipeline(steps)
+
+def create_XGBOOST_pipeline(PCA_n_components=None,**model_params):
+    if PCA_n_components is not None:
+        steps = [
+            ('scaler', StandardScaler()),
+            ('pca', PCA(n_components=PCA_n_components)),
+            ('model', get_xgboost(**model_params))
+        ]
+    else: #If no PCA, no need for scaling (RF properties)
+        steps = [
+            ('model', get_xgboost(**model_params))
         ]
     return Pipeline(steps)
