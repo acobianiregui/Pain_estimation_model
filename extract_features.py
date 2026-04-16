@@ -287,6 +287,15 @@ def extract_window_features(df_window, window_idx):
     row["covas_min"]  = np.nanmin(covas_vals)
     row["covas_diff"] = row["covas_max"] - row["covas_min"]
 
+    # Covas Delta statistics
+    midp = len(covas_vals) // 2
+    firstHalf = covas_vals[:midp]
+    secondHalf = covas_vals[midp:]
+    firstAvg = np.nanmean(firstHalf)
+    secondAvg = np.nanmean(secondHalf)
+    row["covas_delta"] = secondAvg-firstAvg
+    
+
     # Per-signal features
     row.update(ecg_features(df_window["Ecg"].values))
     row.update(eda_features(df_window["Eda_E4"].values, "eda_e4"))
