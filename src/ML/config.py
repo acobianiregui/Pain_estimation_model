@@ -16,7 +16,7 @@ FULL_FEATURES = [
     "emg_rms", "emg_energy",
 ]
 #to be deremined
-EXCLUDED=["subject_idx","window_idx","t_start_s","t_end_s","covas_mean","covas_max","covas_min","covas_diff"]
+EXCLUDED=["subject_idx","window_idx","t_start_s","t_end_s","covas_mean","covas_max","covas_p90","covas_max","covas_min","covas_diff"]
 WEARABLE_FEATURES=[] #to be deremined
 """
 For full set we have the following best parameters:

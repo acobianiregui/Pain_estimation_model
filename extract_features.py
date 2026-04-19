@@ -365,6 +365,8 @@ def resp_features(resp_window, fs=FS):
 def tmp_features(tmp_window):
     feats = {}
     feats.update(basic_stats(tmp_window, "tmp"))
+    del feats["tmp_kurt"]
+    del feats["tmp_skew"]
 
     for k in ["tmp_slope", "tmp_range", "tmp_diff_end_start"]:
         feats[k] = np.nan
@@ -394,13 +396,14 @@ def extract_window_features(df_window, window_idx):
     row["covas_max"] = np.nanmax(covas_vals)
     row["covas_min"] = np.nanmin(covas_vals)
     row["covas_diff"] = row["covas_max"] - row["covas_min"]
+    row["covas_p90"] =  np.nanpercentile(covas_vals, 90)
 
     row.update(ecg_features(df_window["Ecg"].values))
     row.update(eda_features(df_window["Eda_E4"].values, "eda_e4"))
     row.update(eda_features(df_window["Eda_RB"].values, "eda_rb"))
     row.update(bvp_features(df_window["Bvp"].values))
-    row.update(emg_features(df_window["Emg"].values))
-    row.update(resp_features(df_window["Resp"].values))
+    #row.update(emg_features(df_window["Emg"].values))
+    #row.update(resp_features(df_window["Resp"].values))
     row.update(tmp_features(df_window["Tmp"].values))
 
     # Cross-signal: EDA E4 vs RB correlation
@@ -598,7 +601,7 @@ def main():
     get_features(
         input_folder="./data/Filtered",
         output_folder="./features",
-        window_length=10.0,
+        window_length=5.0,
         overlap=True,
         overlap_percentage=50.0,
     )

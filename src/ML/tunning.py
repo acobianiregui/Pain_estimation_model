@@ -1,4 +1,5 @@
 #src/ML/tunning.py
+from scipy.stats import randint, uniform
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
@@ -6,7 +7,7 @@ from sklearn.svm import SVR
 from src.ML.pipelines import create_RF_pipeline, create_SVR_pipeline,create_XGBOOST_pipeline
 
 from sklearn.model_selection import GridSearchCV
-
+from sklearn.model_selection import RandomizedSearchCV
 
 def tune_RF(X_train, y_train,PCA_n_components=None):
     """
@@ -123,12 +124,12 @@ def tune_SVR(X_train, y_train,PCA_n_components=None):
     grid_search.fit(X_train, y_train)
 
     return grid_search
-def tune_XGBOOST(X_train, y_train,PCA_n_components=None):
+def tune_XGBOOST(X_train, y_train,PCA_n_components=None,random=False, n_jobs=-1,random_iter=40):
     if PCA_n_components != None:
         pipeline=create_XGBOOST_pipeline(PCA_n_components=PCA_n_components)
     else:
         pipeline = create_XGBOOST_pipeline()
-
+    """
     param_grid = {
     "model__n_estimators": [200, 300, 400],
     "model__learning_rate": [0.03, 0.05],
@@ -138,14 +139,47 @@ def tune_XGBOOST(X_train, y_train,PCA_n_components=None):
     "model__colsample_bytree": [0.8, 0.9],
     "model__reg_lambda": [3.0, 5.0, 7.0]
     }
-    grid_search = GridSearchCV(
-        estimator=pipeline,
-        param_grid=param_grid,
-        cv=3,
-        scoring='r2',
-        n_jobs=-1
-    )
-
-    grid_search.fit(X_train, y_train)
-
-    return grid_search
+    """
+    param_grid = {
+    "model__n_estimators": [300, 400, 500],
+    "model__learning_rate": [0.03, 0.05],
+    "model__max_depth": [5, 6],
+    "model__min_child_weight": [1, 2],
+    "model__subsample": [0.8],
+    "model__colsample_bytree": [0.8],
+    "model__reg_lambda": [4.0, 5.0, 6.0]
+    }  
+    random_grid={
+        "model__n_estimators": randint(200, 700),
+        "model__learning_rate": uniform(0.02, 0.08),   
+        "model__max_depth": randint(4, 8),             
+        "model__min_child_weight": randint(1, 5),     
+        "model__subsample": uniform(0.75, 0.15),     
+        "model__colsample_bytree": uniform(0.75, 0.15),
+        "model__reg_lambda": uniform(3.0, 4.0),        
+        "model__gamma": uniform(0.0, 0.3)              
+    }
+    if not random : 
+        grid_search = GridSearchCV(
+            estimator=pipeline,
+            param_grid=param_grid,
+            cv=3,
+            scoring='r2',
+            n_jobs=n_jobs,
+            verbose=3
+        )
+        grid_search.fit(X_train, y_train)
+        return grid_search
+    else:
+        random_search=RandomizedSearchCV(
+            estimator=pipeline,
+            param_distributions=random_grid,
+            n_iter=random_iter,
+            scoring="r2",
+            cv=5,
+            verbose=3,
+            random_state=42,
+            n_jobs=n_jobs
+        )
+        random_search.fit(X_train,y_train)
+        return random_search
