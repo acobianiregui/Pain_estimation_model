@@ -40,16 +40,16 @@ def tune_RF(X_train, y_train,PCA_n_components=None):
     #Param_grid soft
     param_grid = {
     'model__n_estimators': [100, 200,300],
-    'model__max_depth': [None, 10,20],
+    'model__max_depth': [None, 10],
     'model__min_samples_split': [2, 5],
     'model__min_samples_leaf': [1, 2],
-    'model__max_features': ['sqrt','log2',1.0]
+    'model__max_features': ['sqrt','log2']
     }
 
     grid_search = GridSearchCV(
         estimator=pipeline,
         param_grid=param_grid,
-        cv=3,
+        cv=5,
         scoring='r2',
         n_jobs=-1
     )
@@ -163,8 +163,8 @@ def tune_XGBOOST(X_train, y_train,PCA_n_components=None,random=False, n_jobs=-1,
         grid_search = GridSearchCV(
             estimator=pipeline,
             param_grid=param_grid,
-            cv=3,
-            scoring='r2',
+            cv=5,
+            scoring='rmse',
             n_jobs=n_jobs,
             verbose=3
         )
@@ -175,7 +175,7 @@ def tune_XGBOOST(X_train, y_train,PCA_n_components=None,random=False, n_jobs=-1,
             estimator=pipeline,
             param_distributions=random_grid,
             n_iter=random_iter,
-            scoring="r2",
+            scoring="rmse",
             cv=5,
             verbose=3,
             random_state=42,

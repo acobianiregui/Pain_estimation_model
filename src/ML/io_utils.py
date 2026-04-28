@@ -22,18 +22,42 @@ def remove_nan(df):
     return df_limpio
 import pandas as pd
 
-def load_data(csv_path, target_name, exclude_cols=None):
+def load_data(csv_path, target_name, exclude_cols=None, feature_cols=None, covas_threshold=5):
     df = pd.read_csv(csv_path)
     print(f"Original shape: {df.shape}")
-    df= remove_nan(df)
-    df = df[df["covas_mean"] > 5].copy()
+
+    df = remove_nan(df)
+
+    if covas_threshold is not None:
+        if "covas_mean" not in df.columns:
+            raise ValueError("Column 'covas_mean' is not in the CSV.")
+        df = df[df["covas_mean"] > covas_threshold].copy()
+
     if target_name not in df.columns:
-        raise ValueError(f"La columna target '{target_name}' no está en el CSV.")
+        raise ValueError(f"Target column '{target_name}' is not in the CSV.")
 
     exclude_cols = exclude_cols or []
-    feature_cols = [col for col in df.columns if col not in exclude_cols + [target_name]]
+
+    if feature_cols is not None:
+        #explicitly specified features
+        missing_cols = [col for col in feature_cols if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"These feature columns are not in the CSV: {missing_cols}")
+
+        if target_name in feature_cols:
+            raise ValueError(f"Target column '{target_name}' cannot be included in feature_cols.")
+
+        #remove excluded columns if they end up in feature_cols
+        feature_cols = [col for col in feature_cols if col not in exclude_cols]
+    else:
+        #all columsns except target and excluded
+        feature_cols = [col for col in df.columns if col not in exclude_cols + [target_name]]
+
+    if len(feature_cols) == 0:
+        raise ValueError("No feature columns selected.")
 
     print(f"New shape: {df.shape}")
+
     X = df[feature_cols].copy()
     y = df[target_name].copy()
 

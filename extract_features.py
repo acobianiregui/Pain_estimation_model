@@ -402,8 +402,8 @@ def extract_window_features(df_window, window_idx):
     row.update(eda_features(df_window["Eda_E4"].values, "eda_e4"))
     row.update(eda_features(df_window["Eda_RB"].values, "eda_rb"))
     row.update(bvp_features(df_window["Bvp"].values))
-    #row.update(emg_features(df_window["Emg"].values))
-    #row.update(resp_features(df_window["Resp"].values))
+    row.update(emg_features(df_window["Emg"].values))
+    row.update(resp_features(df_window["Resp"].values))
     row.update(tmp_features(df_window["Tmp"].values))
 
     # Cross-signal: EDA E4 vs RB correlation
@@ -601,9 +601,9 @@ def main():
     get_features(
         input_folder="./data/Filtered",
         output_folder="./features",
-        window_length=5.0,
-        overlap=True,
-        overlap_percentage=50.0,
+        window_length=10.0,
+        overlap=False,
+        overlap_percentage=0.0,
     )
 
 

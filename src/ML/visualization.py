@@ -135,12 +135,17 @@ def plot_lr_coefficients(pipeline, feature_names):
     plt.ylabel("Coefficient value")
     plt.show()
 ### FEATURE IMPORTANCE (RANDOM FOREST)
-def plot_feature_importance_rf(pipeline, feature_names):
+def plot_feature_importance_rf(pipeline, feature_names,top_n=None):
     if 'pca' in pipeline.named_steps:
         raise ValueError("Cannot plot feature importances vs original names when PCA is used.")
     model = pipeline.named_steps['model'] 
     importances = model.feature_importances_
     indices = np.argsort(importances)[::-1]
+
+    if top_n is not None:
+        if not isinstance(top_n, int) or top_n <= 0:
+            raise ValueError("top_n must be a positive integer or None.")
+        indices = indices[:top_n]
 
     plt.figure()
     plt.bar(range(len(importances)), importances[indices])
@@ -199,5 +204,82 @@ def plot_corr_with_target(X, y, figsize=(8, 14)):
     corr_with_y.plot(kind="barh")
     plt.xlabel("Correlation with target")
     plt.title("Feature Correlation with Target")
+    plt.tight_layout()
+    plt.show()
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+def plot_corr_with_target2(
+    X,
+    y,
+    top_n=12,
+    include_negative=True,
+    figsize=(9, 6),
+    title="Feature Correlation with Target"
+):
+    """
+    Plot the most relevant feature correlations with the target in a slide-friendly way.
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        Feature matrix.
+    y : pd.Series or array-like
+        Target vector.
+    top_n : int, default=12
+        Number of strongest positive correlations to show.
+        If include_negative=True, also shows the top_n most negative correlations.
+    include_negative : bool, default=True
+        Whether to include the strongest negative correlations as well.
+    figsize : tuple, default=(9, 6)
+        Figure size.
+    title : str, default="Feature Correlation with Target"
+        Plot title.
+    """
+    if not isinstance(X, pd.DataFrame):
+        raise TypeError("X must be a pandas DataFrame.")
+
+    y = pd.Series(y).reset_index(drop=True)
+    X = X.reset_index(drop=True)
+
+    if len(X) != len(y):
+        raise ValueError("X and y must have the same number of rows.")
+
+    # Remove constant columns
+    X_clean = X.loc[:, X.nunique(dropna=False) > 1].copy()
+
+    # Compute correlations and remove NaNs
+    corr_with_y = X_clean.corrwith(y).dropna()
+
+    if corr_with_y.empty:
+        raise ValueError("No valid correlations could be computed.")
+
+    if include_negative:
+        top_pos = corr_with_y.sort_values(ascending=False).head(top_n)
+        top_neg = corr_with_y.sort_values(ascending=True).head(top_n)
+        corr_plot = pd.concat([top_neg, top_pos])
+
+        # Remove duplicates if a feature appears in both selections
+        corr_plot = corr_plot[~corr_plot.index.duplicated(keep="first")]
+        corr_plot = corr_plot.sort_values()
+    else:
+        corr_plot = corr_with_y.abs().sort_values(ascending=False).head(top_n).index
+        corr_plot = corr_with_y.loc[corr_plot].sort_values()
+
+    plt.figure(figsize=figsize)
+    ax = corr_plot.plot(kind="barh")
+
+    # Optional color split for readability
+    colors = ["#d62728" if v < 0 else "#1f77b4" for v in corr_plot.values]
+    ax.clear()
+    ax.barh(corr_plot.index, corr_plot.values, color=colors)
+
+    ax.axvline(0, color="black", linewidth=1)
+    ax.set_xlabel("Correlation with target")
+    ax.set_title(title)
+    ax.tick_params(axis="y", labelsize=9)
+
     plt.tight_layout()
     plt.show()
